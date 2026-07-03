@@ -458,7 +458,18 @@ def installed_version_id(profile: dict[str, Any]) -> str:
 
 
 def version_is_installed(minecraft_dir: Path, version_id: str) -> bool:
-    return (minecraft_dir / "versions" / version_id / f"{version_id}.json").is_file()
+    version_dir = minecraft_dir / "versions" / version_id
+    version_json = version_dir / f"{version_id}.json"
+    if not version_json.is_file():
+        return False
+    try:
+        metadata = json.loads(version_json.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    parent_id = str(metadata.get("inheritsFrom") or "")
+    if parent_id:
+        return version_is_installed(minecraft_dir, parent_id)
+    return (version_dir / f"{version_id}.jar").is_file()
 
 
 def system_java_enabled() -> bool:
