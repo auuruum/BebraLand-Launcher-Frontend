@@ -9,6 +9,7 @@ import json
 import os
 import re
 import shutil
+import ssl
 import sys
 import threading
 import time
@@ -16,6 +17,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import urlsplit
+
+import certifi
 
 from PySide6.QtCore import QLockFile, QPoint, Property, QObject, QRect, Qt, QUrl, Signal, Slot
 from PySide6.QtGui import QCursor, QDesktopServices, QIcon
@@ -94,6 +97,10 @@ def append_log(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as handle:
         handle.write(f"[{stamp}] {text}\n")
+
+
+def https_context() -> ssl.SSLContext:
+    return ssl.create_default_context(cafile=certifi.where())
 
 
 def strip_html(value: Any) -> str:
@@ -238,7 +245,7 @@ def download_profile_asset(url: str) -> bool:
         headers={"Accept": "image/*", "User-Agent": f"BebraLand Launcher/{__version__}"},
         method="GET",
     )
-    with urllib.request.urlopen(request, timeout=20) as response, tmp.open("wb") as handle:
+    with urllib.request.urlopen(request, timeout=20, context=https_context()) as response, tmp.open("wb") as handle:
         while True:
             chunk = response.read(1024 * 256)
             if not chunk:
@@ -827,7 +834,7 @@ class LauncherWindow(QWidget):
                 headers={"Accept": "image/*", "User-Agent": f"BebraLand Launcher/{__version__}"},
                 method="GET",
             )
-            with urllib.request.urlopen(request, timeout=20) as response:
+            with urllib.request.urlopen(request, timeout=20, context=https_context()) as response:
                 data = response.read(MAX_SKIN_RENDER_BYTES + 1)
         except Exception as exc:
             self.bridge.log.emit(f"Skin render unavailable: {exc}")
@@ -1096,7 +1103,7 @@ class LauncherWindow(QWidget):
     def fetch_news(self) -> None:
         def task() -> None:
             request = urllib.request.Request(NEWS_API_URL, headers={"Accept": "application/json"}, method="GET")
-            with urllib.request.urlopen(request, timeout=20) as response:
+            with urllib.request.urlopen(request, timeout=20, context=https_context()) as response:
                 payload = json.loads(response.read().decode("utf-8"))
             posts = []
             if isinstance(payload, list):

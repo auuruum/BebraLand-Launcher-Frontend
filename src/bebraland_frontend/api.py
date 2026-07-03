@@ -13,6 +13,8 @@ import uuid
 from typing import Any, Callable
 from urllib.parse import urljoin, urlsplit, urlunsplit
 
+import certifi
+
 from .config import build_update_id, platform_id
 
 
@@ -48,7 +50,7 @@ class WebSocketConnection:
         port = parsed.port or (443 if parsed.scheme == "wss" else 80)
         raw_socket = socket.create_connection((parsed.hostname, port), timeout=self.timeout)
         if parsed.scheme == "wss":
-            context = ssl.create_default_context()
+            context = ssl.create_default_context(cafile=certifi.where())
             sock: socket.socket | ssl.SSLSocket = context.wrap_socket(raw_socket, server_hostname=parsed.hostname)
         else:
             sock = raw_socket
