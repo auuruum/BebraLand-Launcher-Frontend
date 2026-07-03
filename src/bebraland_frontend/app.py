@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ctypes
 import ctypes.wintypes
+import datetime
 import hashlib
 import html
 import json
@@ -80,6 +81,18 @@ HTBOTTOMLEFT = 16
 HTBOTTOMRIGHT = 17
 QML_MAIN = GML_ASSETS_DIR.parent / "qml" / "Main.qml"
 APP_ICON_PATH = GML_IMAGES_DIR / "logo.ico"
+
+
+def launcher_log_path() -> Path:
+    stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    return launcher_data_dir() / "logs" / f"launcher-{stamp}.log"
+
+
+def append_log(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(f"[{stamp}] {text}\n")
 
 
 def strip_html(value: Any) -> str:
@@ -315,8 +328,10 @@ class LauncherWindow(QWidget):
         self._pack_operation_running = False
         self._cancel_event: threading.Event | None = None
         self._minecraft_process: Any | None = None
+        self._log_path = launcher_log_path()
         self._log_cleanup_cache: dict[str, dict[str, Any]] = {}
         self._state: dict[str, Any] = {}
+        append_log(self._log_path, f"BebraLand Launcher {__version__} started")
 
         self.apply_install_root()
         self.bridge = Bridge()
@@ -882,6 +897,7 @@ class LauncherWindow(QWidget):
         save_settings(self.settings)
 
     def log_line(self, text: str) -> None:
+        append_log(self._log_path, text)
         self.status_text = text
         self.refresh_state()
 
