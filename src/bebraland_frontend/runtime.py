@@ -1156,6 +1156,20 @@ def ensure_mojang_java_runtime(
         minecraft_launcher_lib.runtime.install_jvm_runtime(runtime_name, str(minecraft_dir), callback=callback)
 
 
+def validate_launch_executable(command: list[str]) -> None:
+    if not command:
+        raise RuntimeError("Minecraft launch command is empty")
+    executable = str(command[0])
+    path = Path(executable)
+    has_directory = path.is_absolute() or path.parent != Path(".")
+    if has_directory:
+        if not path.is_file():
+            raise FileNotFoundError(f"Minecraft executable not found: {path}")
+        return
+    if not shutil.which(executable):
+        raise FileNotFoundError(f"Minecraft executable not found on PATH: {executable}")
+
+
 def launch_minecraft(
     manifest: dict[str, Any],
     game_dir: Path,
@@ -1237,4 +1251,5 @@ def launch_minecraft(
                 javaw_exe = java_path.with_name("javaw.exe")
                 if javaw_exe.is_file():
                     command[0] = str(javaw_exe)
+    validate_launch_executable(command)
     return subprocess.Popen(command, cwd=str(game_dir), creationflags=creationflags)
