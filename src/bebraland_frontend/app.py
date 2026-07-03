@@ -89,8 +89,9 @@ def launcher_log_path() -> Path:
 
 
 def append_log(path: Path, text: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
     stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"[{stamp}] {text}", flush=True)
+    path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as handle:
         handle.write(f"[{stamp}] {text}\n")
 
