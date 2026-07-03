@@ -971,6 +971,17 @@ def install_mod_loader(
 
         status(f"Install {loader_id} {loader_version} for Minecraft {minecraft_version} to shared cache")
         mod_loader = minecraft_launcher_lib.mod_loader.get_mod_loader(loader_id)
+        if not java_path:
+            ensure_mojang_java_runtime(minecraft_version, minecraft_dir, status, progress)
+            try:
+                information = minecraft_launcher_lib.runtime.get_version_runtime_information(minecraft_version, str(minecraft_dir))
+                runtime_path = minecraft_launcher_lib.runtime.get_executable_path(str(information["name"]), str(minecraft_dir))
+            except Exception as exc:
+                status(f"Mojang Java runtime path unavailable: {exc}")
+                runtime_path = None
+            if runtime_path:
+                java_path = str(runtime_path)
+                status(f"Use Mojang Java runtime: {java_path}")
         with track_streamed_request_bytes(install_progress.add_downloaded_bytes):
             return mod_loader.install(
                 minecraft_version,
