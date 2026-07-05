@@ -1,7 +1,7 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from bebraland_frontend.runtime import version_is_installed
+from bebraland_frontend.runtime import apply_cleanup_tasks, version_is_installed
 
 
 def write_version(root: Path, version_id: str, metadata: str = "{}") -> Path:
@@ -23,5 +23,21 @@ def test_inherited_version_requires_parent_jar() -> None:
         assert version_is_installed(root, "neoforge-21.1.233")
 
 
+def test_cleanup_task_runs_once_per_id() -> None:
+    with TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        target = root / ".voxy"
+        target.mkdir()
+
+        task = {"id": "cleanup-1", "paths": [".voxy"]}
+        assert apply_cleanup_tasks(root, [task], lambda _: None) == 1
+        assert not target.exists()
+
+        target.mkdir()
+        assert apply_cleanup_tasks(root, [task], lambda _: None) == 0
+        assert target.exists()
+
+
 if __name__ == "__main__":
     test_inherited_version_requires_parent_jar()
+    test_cleanup_task_runs_once_per_id()

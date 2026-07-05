@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+from datetime import datetime, timezone
 import fnmatch
 import hashlib
 import json
@@ -705,6 +706,54 @@ def write_manifest(game_dir: Path, manifest: dict[str, Any]) -> None:
     path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
+def cleanup_ledger_path(game_dir: Path) -> Path:
+    return state_dir(game_dir) / "cleanup_tasks.json"
+
+
+def read_cleanup_ledger(game_dir: Path) -> dict[str, Any]:
+    path = cleanup_ledger_path(game_dir)
+    if not path.exists():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def write_cleanup_ledger(game_dir: Path, ledger: dict[str, Any]) -> None:
+    cleanup_ledger_path(game_dir).write_text(json.dumps(ledger, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+def is_cleanup_protected(path: str) -> bool:
+    return matches_any(path, SYSTEM_PROTECTED_LOCAL_PATTERNS)
+
+
+def apply_cleanup_tasks(game_dir: Path, tasks: list[dict[str, Any]], status: Status) -> int:
+    ledger = read_cleanup_ledger(game_dir)
+    removed = 0
+    changed = False
+    for task in tasks:
+        task_id = str(task.get("id") or "").strip()
+        paths = task.get("paths") or []
+        if not task_id or task_id in ledger or not isinstance(paths, list):
+            continue
+        for raw_path in paths:
+            rel = str(raw_path or "").replace("\\", "/").strip("/")
+            if not rel or is_cleanup_protected(rel):
+                continue
+            target = local_instance_path(game_dir, rel)
+            removed += remove_local_path(target)
+            remove_empty_parents(target, game_dir)
+        ledger[task_id] = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+        changed = True
+    if changed:
+        write_cleanup_ledger(game_dir, ledger)
+    if removed:
+        status(f"Cleanup tasks done: removed={removed}")
+    return removed
+
+
 def remove_local_path(path: Path) -> int:
     if path.is_symlink() or path.is_file():
         path.unlink()
@@ -925,6 +974,7 @@ def sync_manifest(
 
     check_cancel(cancelled)
     stats["removed"] = cleanup_extra_files(game_dir, set(wanted), rules, status, disabled_optional)
+    apply_cleanup_tasks(game_dir, list(manifest.get("cleanup_tasks") or []), status)
 
     saved_manifest = dict(manifest)
     if selected_optional_mod_ids is not None:
